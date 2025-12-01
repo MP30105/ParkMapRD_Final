@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="pinGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#13c3e6"/>
+      <stop offset="100%" stop-color="#067a9e"/>
+    </linearGradient>
+    <filter id="pinShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <!-- Transparent background (no rect) -->
+  <g filter="url(#pinShadow)">
+    <path d="M32 4c-11.046 0-20 8.954-20 20 0 14.848 16.76 31.012 19.012 33.148a1.5 1.5 0 0 0 1.976 0C35.24 55.012 52 38.848 52 24c0-11.046-8.954-20-20-20Z" fill="url(#pinGrad)" stroke="#054865" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="32" cy="24" r="9" fill="#f8fafc" stroke="#0e7490" stroke-width="2"/>
+  </g>
+</svg>

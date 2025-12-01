@@ -1,0 +1,106 @@
+[
+  {
+    "id": "u1",
+    "email": "t_1763018004770@example.com",
+    "passwordHash": "$2a$10$piWNyzFW8X46jI0IspK6Se.d9ReUvQawVSPCjC9jpM2tIMZnO8CJm",
+    "name": "T",
+    "licensePlate": "X"
+  },
+  {
+    "id": "u2",
+    "email": "t_1763018337983@example.com",
+    "passwordHash": "$2a$10$Q5l8pU.HAhmsjVtCKKiH8e1S4J9./HKBO1rqcsC9Nw1wlNhDs.Wwe",
+    "name": "T",
+    "licensePlate": "X"
+  },
+  {
+    "id": "u3",
+    "email": "matthewpena0105@gmail.com",
+    "passwordHash": "$2a$10$p03n63nijtjLenUtqGao2uDsjO28q8WQISSxp/pMhuD4M2jbf3GoO",
+    "name": "Matthew",
+    "licensePlate": "123456"
+  },
+  {
+    "id": "u4",
+    "email": "t_1763020048157@example.com",
+    "passwordHash": "$2a$10$ubleX4O5uLnInzu23mUkeOLyPZ7x20Ra1WFI/vKgoXAprRl6hD4bq",
+    "name": "T",
+    "licensePlate": "X"
+  },
+  {
+    "id": "u5",
+    "email": "t_1763020156871@example.com",
+    "passwordHash": "$2a$10$ZLc81ltxGGi1GtT.bT7ZaOQ52qw8k1L8zQqxx0RRbsURRIZSPksDS",
+    "name": "T",
+    "licensePlate": "X"
+  },
+  {
+    "id": "u6",
+    "email": "testuser+1763020168823@example.com",
+    "passwordHash": "$2a$10$sgzkZoS6AEU7824GqMtxBuGZ7w5KzuRCcg7dGRsKhPj1ac8XmHD46",
+    "name": "Demo User",
+    "licensePlate": "ABC-123"
+  },
+  {
+    "id": "u7",
+    "email": "testuser+1763021110681@example.com",
+    "passwordHash": "$2a$10$DDxDoYzgZFh3Kk5iMvM2NejDglMCdTD6qcBC4Nn4u2W2/SLl5cx2.",
+    "name": "Demo User",
+    "licensePlate": "ABC-123"
+  },
+  {
+    "id": "u8",
+    "email": "main@parkmaprd.local",
+    "username": "main",
+    "passwordHash": "$2a$10$AIZ17AJHY9M.oq7PpGJ9R.mfR/w/pif1YKOJ85jAB449WemkG6Dgi",
+    "name": "Main Admin",
+    "role": "main",
+    "cars": [],
+    "tickets": [],
+    "wallets": []
+  },
+  {
+    "id": "u9",
+    "email": "admin@parkmaprd.local",
+    "passwordHash": "$2a$10$cvFcPf80x.jdRHzHn8Cia.H2ho.D4P5LN9U4wREjPwbjL/YG85KUy",
+    "name": "Admin",
+    "role": "admin",
+    "cars": [],
+    "tickets": [],
+    "wallets": []
+  },
+  {
+    "id": "u10",
+    "email": "demo@parkmaprd.local",
+    "passwordHash": "$2a$10$ilr92IsrQqZz62Hxwjd0qOgM/jyHTrPZjxL48L5ur1p.3xeoxiqL6",
+    "name": "Demo User",
+    "role": "user",
+    "cars": [
+      {
+        "id": "c1",
+        "brand": "",
+        "model": "",
+        "plate": "ABC-123"
+      }
+    ],
+    "tickets": [],
+    "wallets": []
+  },
+  {
+    "id": "u11",
+    "email": "t_1763160281901@example.com",
+    "passwordHash": "$2a$10$/oG9J4QMJmNLUwaxVfRxaemwz8laxs2VtMWdJlROrLBR4ge/TNucy",
+    "name": "T",
+    "role": "user",
+    "cars": [
+      {
+        "id": "c1",
+        "brand": "",
+        "model": "",
+        "plate": "X"
+      }
+    ],
+    "tickets": [],
+    "wallets": []
+  }
+]

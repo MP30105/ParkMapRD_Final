@@ -1,0 +1,6 @@
+id,name,lat,lng,totalSpots,availableSpots,hourlyRate,securityVideoUrl
+p_sample_1,"Plaza Central",18.4861,-69.9312,25,20,120,"https://example.com/camera1"
+p_sample_2,"Parking Norte",18.4923,-69.9387,40,35,100,"https://example.com/camera2"
+p_sample_3,"Estacionamiento Sur",18.4756,-69.9298,15,12,80,""
+p_sample_4,"Garage Premium",18.4834,-69.9445,60,45,150,"https://example.com/camera4"
+p_sample_5,"Parqueo Económico",18.4678,-69.9156,30,28,75,""

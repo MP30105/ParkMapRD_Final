@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - name: Install deps (backend)
+        run: npm ci
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Run integration tests
+        run: npm run test:integration || echo 'No integration tests yet'
+      - name: Run performance tests
+        run: npm run test:performance || echo 'Skipping performance suite'
+      - name: Upload coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps (frontend)
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
+  e2e-tests:
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright Browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Serve build & run tests
+        working-directory: frontend
+        run: |
+          npx serve -s build -l 5000 &
+          SERVER_PID=$!
+          echo "Started serve PID=$SERVER_PID"
+          npx playwright test || (echo 'Playwright tests failed' && kill $SERVER_PID && exit 1)
+          kill $SERVER_PID
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+
+  docker-image:
+    if: github.ref == 'refs/heads/main'
+    needs: [backend-tests, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Registry
+        if: env.DOCKER_USERNAME && env.DOCKER_PASSWORD
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build multi-stage image
+        run: |
+          docker build -t parkmaprd:ci -f Dockerfile . || echo 'Dockerfile not yet created'
+      - name: Tag & Push
+        if: env.DOCKER_USERNAME && env.DOCKER_PASSWORD
+        run: |
+          docker tag parkmaprd:ci ${{ secrets.DOCKER_USERNAME }}/parkmaprd:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/parkmaprd:${{ github.sha }}

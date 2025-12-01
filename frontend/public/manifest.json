@@ -1,0 +1,63 @@
+{
+  "short_name": "PARKMAPRD",
+  "name": "PARKMAPRD - Sistema de Gestión de Parqueos",
+  "description": "Encuentra, reserva y paga estacionamientos de forma rápida y segura",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable any"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#3498db",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["transportation", "utilities", "productivity"],
+  "lang": "es",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Reservar Estacionamiento",
+      "short_name": "Reservar",
+      "description": "Encontrar y reservar un estacionamiento rápidamente",
+      "url": "/?action=reserve",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mis Reservas",
+      "short_name": "Reservas",
+      "description": "Ver mis reservas activas",
+      "url": "/?view=reservations",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Promociones",
+      "short_name": "Promos",
+      "description": "Ver promociones y puntos de lealtad",
+      "url": "/?view=promotions",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+parkmaprd",
+      "url": "/?parking=%s"
+    }
+  ]
+}

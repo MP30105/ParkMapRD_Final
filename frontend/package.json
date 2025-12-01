@@ -1,0 +1,65 @@
+{
+  "name": "parkmaprd-frontend",
+  "version": "1.2.0",
+  "private": true,
+  "homepage": ".",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build && npm run build:pwa",
+    "build:pwa": "node scripts/build-pwa.js",
+    "test": "react-scripts test --env=jsdom --watchAll=false",
+    "test:unit": "react-scripts test --env=jsdom --watchAll=false --testPathPattern=__tests__",
+    "test:coverage": "react-scripts test --env=jsdom --watchAll=false --coverage",
+    "test:watch": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject",
+    "e2e:install": "npx playwright install --with-deps",
+    "e2e:test": "npx playwright test --project=chromium",
+    "e2e:test:all": "npx playwright test",
+    "e2e:test:headed": "npx playwright test --headed",
+    "e2e:report": "npx playwright show-report",
+    "serve": "npx serve -s build -l 3000",
+    "analyze": "npx webpack-bundle-analyzer build/static/js/*.js",
+    "lighthouse": "npx lighthouse http://localhost:3000 --view --output-path=./lighthouse-report.html"
+  },
+  "dependencies": {
+    "@changey/react-leaflet-markercluster": "^4.0.0-rc1",
+    "@react-google-maps/api": "^2.16.1",
+    "ajv": "^8.17.1",
+    "ajv-keywords": "^5.1.0",
+    "leaflet": "^1.9.4",
+    "qrcode.react": "^4.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-leaflet-cluster": "^4.0.0",
+    "react-router-dom": "^6.20.0",
+    "react-scripts": "5.0.1",
+    "workbox-webpack-plugin": "^6.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.38.0",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.4.3",
+    "lighthouse": "^11.0.0",
+    "playwright": "^1.38.0",
+    "webpack-bundle-analyzer": "^4.9.1"
+  },
+  "description": "ParkMapRD - Sistema inteligente de gestión de parqueos",
+  "keywords": [
+    "pwa",
+    "parking",
+    "reservations",
+    "payments",
+    "dominican-republic"
+  ],
+  "author": "ParkMapRD Team",
+  "pwa": {
+    "name": "ParkMapRD",
+    "short_name": "ParkMapRD",
+    "theme_color": "#3498db",
+    "background_color": "#ffffff",
+    "display": "standalone",
+    "start_url": "/"
+  }
+}

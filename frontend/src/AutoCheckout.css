@@ -1,0 +1,522 @@
+/* Auto-Checkout Component Styles */
+.auto-checkout-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - var(--topbar-height));
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.auto-checkout-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.auto-checkout-title {
+  margin: 0 0 10px 0;
+  color: #1f2937;
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.auto-checkout-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 18px;
+}
+
+/* Tab Navigation */
+.auto-checkout-tabs {
+  display: flex;
+  border-bottom: 3px solid #e5e7eb;
+  margin-bottom: 30px;
+  background: white;
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.auto-checkout-tab {
+  padding: 16px 28px;
+  border: none;
+  background: none;
+  border-bottom: 3px solid transparent;
+  color: #6b7280;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auto-checkout-tab:hover {
+  background: #f8fafc;
+  color: #4b5563;
+}
+
+.auto-checkout-tab.active {
+  border-bottom-color: #3b82f6;
+  color: #3b82f6;
+  font-weight: 600;
+  background: #eff6ff;
+}
+
+.auto-checkout-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+}
+
+/* Content Cards */
+.auto-checkout-card {
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border: 1px solid #e5e7eb;
+  margin-bottom: 25px;
+  transition: all 0.3s ease;
+}
+
+.auto-checkout-card:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  transform: translateY(-2px);
+}
+
+.auto-checkout-card-title {
+  margin: 0 0 20px 0;
+  color: #1f2937;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Status Indicators */
+.location-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.location-status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.location-status-dot.granted {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.location-status-dot.denied {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.location-status-dot.unknown {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.location-status-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+}
+
+/* Buttons */
+.auto-checkout-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.auto-checkout-btn.primary {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+.auto-checkout-btn.primary:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.auto-checkout-btn.success {
+  background: linear-gradient(135deg, #10b981, #047857);
+  color: white;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.auto-checkout-btn.success:hover {
+  background: linear-gradient(135deg, #059669, #065f46);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  transform: translateY(-2px);
+}
+
+.auto-checkout-btn.danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.auto-checkout-btn.danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  transform: translateY(-2px);
+}
+
+.auto-checkout-btn.secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.auto-checkout-btn.secondary:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.auto-checkout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Ticket Cards */
+.ticket-card {
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+
+.ticket-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+}
+
+.ticket-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.ticket-card-title {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.ticket-card-details {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ticket-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+/* Checkout Status Cards */
+.checkout-card {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+
+.checkout-card.pending {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+}
+
+.checkout-card.completed {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-left: 4px solid #10b981;
+}
+
+.checkout-card.cancelled {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-left: 4px solid #6b7280;
+}
+
+.checkout-card.failed {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-left: 4px solid #ef4444;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.pending {
+  background: #f59e0b;
+  color: white;
+}
+
+.status-badge.completed {
+  background: #10b981;
+  color: white;
+}
+
+.status-badge.cancelled {
+  background: #6b7280;
+  color: white;
+}
+
+.status-badge.failed {
+  background: #ef4444;
+  color: white;
+}
+
+/* Notifications */
+.notification-card {
+  padding: 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  border: 1px solid #e2e8f0;
+}
+
+.notification-card.unread {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-left: 4px solid #3b82f6;
+}
+
+.notification-card.read {
+  background: #f8fafc;
+  border-left: 4px solid #e5e7eb;
+}
+
+.notification-card:hover {
+  background: #f1f5f9;
+  transform: translateX(4px);
+}
+
+.notification-card.unread:hover {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.notification-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.notification-message {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.notification-time {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.notification-unread-dot {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Tracking Status */
+.tracking-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tracking-indicator {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracking-indicator.active {
+  color: #10b981;
+}
+
+.tracking-indicator.inactive {
+  color: #ef4444;
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #4b5563;
+}
+
+.empty-state-message {
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .auto-checkout-container {
+    padding: 15px;
+  }
+  
+  .auto-checkout-tabs {
+    flex-direction: column;
+  }
+  
+  .auto-checkout-tab {
+    padding: 12px 20px;
+  }
+  
+  .auto-checkout-card {
+    padding: 20px;
+  }
+  
+  .ticket-card-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .ticket-card-actions {
+    justify-content: stretch;
+  }
+  
+  .auto-checkout-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .auto-checkout-title {
+    font-size: 24px;
+  }
+  
+  .auto-checkout-subtitle {
+    font-size: 16px;
+  }
+  
+  .auto-checkout-card {
+    padding: 15px;
+  }
+  
+  .location-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .auto-checkout-container {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  }
+  
+  .auto-checkout-card {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f3f4f6;
+  }
+  
+  .auto-checkout-card-title {
+    color: #f9fafb;
+  }
+  
+  .ticket-card {
+    background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+  }
+  
+  .notification-card {
+    background: #374151;
+    color: #f3f4f6;
+  }
+  
+  .notification-title {
+    color: #f9fafb;
+  }
+}

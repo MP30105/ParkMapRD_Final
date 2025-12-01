@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#3498db" />
+    <meta name="description" content="PARKMAPRD - Sistema inteligente de gestión de parqueos. Encuentra, reserva y paga estacionamientos fácilmente." />
+    <meta name="keywords" content="parqueo, estacionamiento, reserva, pago, República Dominicana" />
+    <meta name="author" content="PARKMAPRD" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="PARKMAPRD" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#3498db" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- Manifest and Icons -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <title>PARKMAPRD - Gestión Inteligente de Parqueos</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://api.stripe.com">
+    
+    <style>
+      /* Loading screen while app initializes */
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        z-index: 9999;
+      }
+      
+      .loading-logo {
+        width: 80px;
+        height: 80px;
+        background: white;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin-bottom: 20px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      
+      .loading-text {
+        font-size: 24px;
+        font-weight: 300;
+        margin-bottom: 10px;
+      }
+      
+      .loading-subtitle {
+        font-size: 14px;
+        opacity: 0.8;
+        margin-bottom: 30px;
+      }
+      
+      .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading-screen">
+      <div class="loading-logo">🅿️</div>
+      <div class="loading-text">PARKMAPRD</div>
+      <div class="loading-subtitle">Cargando aplicación...</div>
+      <div class="loading-spinner"></div>
+    </div>
+    
+    <div id="root"></div>
+    
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #3498db; color: white; padding: 15px; text-align: center; z-index: 1000;">
+      <div style="margin-bottom: 10px;">
+        <strong>📱 Instalar PARKMAPRD</strong><br>
+        <small>Accede más rápido desde tu pantalla de inicio</small>
+      </div>
+      <button id="pwa-install-btn" style="background: white; color: #3498db; border: none; padding: 8px 16px; border-radius: 4px; margin-right: 10px; cursor: pointer;">
+        Instalar
+      </button>
+      <button id="pwa-dismiss-btn" style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer;">
+        Después
+      </button>
+    </div>
+
+    <script>
+      // Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+              
+              // Check for updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New update available
+                    if (confirm('Nueva versión disponible. ¿Actualizar ahora?')) {
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                      window.location.reload();
+                    }
+                  }
+                });
+              });
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+
+          // Listen for SW updates
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+          });
+        });
+      }
+
+      // PWA Install Banner
+      let deferredPrompt;
+      const installBanner = document.getElementById('pwa-install-banner');
+      const installBtn = document.getElementById('pwa-install-btn');
+      const dismissBtn = document.getElementById('pwa-dismiss-btn');
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Show install banner if not dismissed recently
+        if (!localStorage.getItem('pwa-dismissed') || 
+            Date.now() - parseInt(localStorage.getItem('pwa-dismissed')) > 7 * 24 * 60 * 60 * 1000) {
+          setTimeout(() => {
+            installBanner.style.display = 'block';
+          }, 3000);
+        }
+      });
+
+      installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          // Only call prompt if this is a real user gesture
+          if (window.event && window.event.isTrusted) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              console.log('PWA installed');
+            }
+            deferredPrompt = null;
+            installBanner.style.display = 'none';
+          } else {
+            console.warn('PWA install prompt blocked: not a user gesture');
+          }
+        }
+      });
+
+      dismissBtn.addEventListener('click', () => {
+        installBanner.style.display = 'none';
+        localStorage.setItem('pwa-dismissed', Date.now().toString());
+      });
+
+      // Hide loading screen when React app loads
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const loadingScreen = document.getElementById('loading-screen');
+          if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+              loadingScreen.style.display = 'none';
+            }, 500);
+          }
+        }, 1500);
+      });
+
+      // Offline detection
+      window.addEventListener('online', () => {
+        console.log('Back online');
+        // Notify app about connection status
+        window.dispatchEvent(new CustomEvent('connection-change', { detail: { online: true } }));
+      });
+
+      window.addEventListener('offline', () => {
+        console.log('Gone offline');
+        window.dispatchEvent(new CustomEvent('connection-change', { detail: { online: false } }));
+      });
+
+      // Performance monitoring
+      window.addEventListener('load', () => {
+        if (window.performance) {
+          const loadTime = window.performance.timing.loadEventEnd - window.performance.timing.navigationStart;
+          console.log(`App loaded in ${loadTime}ms`);
+        }
+      });
+    </script>
+  </body>
+</html>

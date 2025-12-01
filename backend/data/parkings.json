@@ -1,0 +1,29 @@
+[
+  {
+    "id": "p1",
+    "name": "Main Street Parking",
+    "lat": 18.4861,
+    "lng": -69.9312,
+    "totalSpots": 20,
+    "availableSpots": 12,
+    "hourlyRate": 100
+  },
+  {
+    "id": "p2",
+    "name": "Downtown Garage",
+    "lat": 18.4723,
+    "lng": -69.9399,
+    "totalSpots": 50,
+    "availableSpots": 5,
+    "hourlyRate": 120
+  },
+  {
+    "id": "p1763175281341",
+    "name": "pollo",
+    "lat": 18.495157,
+    "lng": -69.954071,
+    "totalSpots": 10,
+    "availableSpots": 10,
+    "hourlyRate": 80
+  }
+]

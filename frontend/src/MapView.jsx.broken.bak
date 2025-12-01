@@ -1,0 +1,1176 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap, CircleMarker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import { apiGet, apiPost, apiDelete, attachAuth } from './api';
+import { haversineKm, etaMinutes } from './utils/distance';
+import { useToast } from './ToastProvider';
+import ReservationModal from './ReservationModal';
+import StripeCheckout from './StripeCheckout';
+import ParkingRating from './ParkingRating';
+
+const defaultCenter = { lat: 18.4861, lng: -69.9312 };
+
+try {
+  delete L.Icon.Default.prototype._getIconUrl; // ensure override works in CRA
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+    iconUrl: require('leaflet/dist/images/marker-icon.png'),
+    shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+  });
+} catch (_) {}
+
+function RecenterMap({ position }) {
+  const map = useMap();
+  useEffect(() => { if (position) map.setView([position.lat, position.lng], map.getZoom()); }, [position, map]);
+  return null;
+}
+
+function ZoomHandler({ setZoomLevel }) {
+  const map = useMapEvents({
+    zoomend: () => {
+      setZoomLevel(map.getZoom());
+    },
+  });
+  return null;
+}
+
+export default function MapView({ token, parkings = [], selectedParking, setSelectedParking, darkMode }) {
+  const { showToast } = useToast();
+  const [favorites, setFavorites] = useState([]);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(12);
+  const [userPos, setUserPos] = useState(defaultCenter);
+  const [showReservationModal, setShowReservationModal] = useState(null);
+  const [showStripeCheckout, setShowStripeCheckout] = useState(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    apiGet('parkmaprd/users/me/favorites', attachAuth(token))
+      .then(data => Array.isArray(data) ? data : [])
+      .then(setFavorites)
+      .catch(() => setFavorites([]));
+  }, [token]);
+
+  const toggleFavorite = async (parkingId) => {
+    if (!token) { showToast('info', 'Inicia sesión para guardar favoritos'); return; }
+    const isFav = favorites.includes(parkingId);
+    try {
+      if (isFav) {
+        await apiDelete(`parkmaprd/users/me/favorites/${parkingId}`, attachAuth(token));
+        setFavorites(favorites.filter(id => id !== parkingId));
+        showToast('success', 'Favorito removido');
+      } else {
+        await apiPost(`parkmaprd/users/me/favorites/${parkingId}`, {}, attachAuth(token));
+        setFavorites([...favorites, parkingId]);
+        showToast('success', 'Añadido a favoritos');
+      }
+    } catch (e) {
+      showToast('error', 'Error al actualizar favorito');
+    }
+  };
+
+  const filteredParkings = useMemo(() => {
+    return parkings.map(p => {
+      if (userPos) {
+        const d = haversineKm(userPos.lat, userPos.lng, p.lat, p.lng);
+        return { ...p, distanceKm: d, etaMin: etaMinutes(d) };
+      }
+      return { ...p, distanceKm: undefined, etaMin: undefined };
+    });
+  }, [parkings, userPos]);
+
+  const baseIconUrl = process.env.PUBLIC_URL + '/pin.svg';
+  const createIcon = (isSelected, isHovered) => {
+    const base = Math.max(18, Math.min(60, 24 + (zoomLevel - 12) * 4));
+    let size = base;
+    if (isSelected) size *= 1.4; else if (isHovered) size *= 1.2;
+    const iconSize = [size, size];
+    return L.icon({
+      iconUrl: baseIconUrl,
+      iconSize,
+      iconAnchor: [iconSize[0] / 2, iconSize[1]],
+      popupAnchor: [0, -iconSize[1] * 0.6],
+      className: `parking-marker-icon${isSelected ? ' selected' : ''}${isHovered ? ' hovered' : ''}`
+    });
+  };
+
+  const locateMe = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude }; setUserPos(next);
+    });
+  };
+
+  return (
+    <MapContainer
+      center={[defaultCenter.lat, defaultCenter.lng]}
+      zoom={12}
+      style={{ height: '100%', width: '100%' }}
+    >
+      <TileLayer
+                    attribution={darkMode ? '&copy; CARTO' : '&copy; OpenStreetMap contributors'}
+                    url={darkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
+                  />
+      <RecenterMap position={userPos} />
+      <ZoomHandler setZoomLevel={setZoomLevel} />
+
+                  <div style={{position:'absolute',right:16,top:16,zIndex:4001,display:'flex',flexDirection:'column',gap:8}}>
+                    <button className="btn btn--glass tool-btn" onClick={locateMe}>📍</button>
+                  </div>
+
+                  {filteredParkings.map(p => {
+                    const isSelected = selectedParking && selectedParking.id === p.id;
+                    return (
+                      <Marker
+                        key={p.id}
+                        position={[p.lat, p.lng]}
+                        icon={createIcon(isSelected, hoveredId === p.id)}
+                        eventHandlers={{
+                          click: () => setSelectedParking(p),
+                          mouseover: () => setHoveredId(p.id),
+                          mouseout: () => setHoveredId(null)
+                        }}
+                      >
+                        <Popup>
+                          <div style={{ minWidth: 220 }}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                              <div style={{flex: 1}}>
+                                <h4 style={{ margin: '0 0 4px 0' }}>{p.name}</h4>
+                                <ParkingRating parkingId={p.id} size="normal" />
+                              </div>
+                              {token && (
+                                <button
+                                  onClick={() => toggleFavorite(p.id)}
+                                  style={{background:'none',border:'none',fontSize:20,cursor:'pointer',padding:0,flexShrink:0,marginLeft:8}}
+                                  title={favorites.includes(p.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                >
+                                  {favorites.includes(p.id) ? '⭐' : '☆'}
+                                </button>
+                              )}
+                            </div>
+                            <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                              {p.availableSpots} / {p.totalSpots} espacios disponibles
+                            </p>
+                            {p.distanceKm !== undefined && (
+                              <p style={{ margin: '6px 0', color: '#06b6d4', fontWeight: 600 }}>
+                                ⏱ ETA: {Math.round(p.etaMin || 0)} min
+                              </p>
+                            )}
+                            {p.availableSpots === 0 ? (
+                              <div className="popup-actions"><button className="btn" onClick={() => showToast('info','Busca otro parqueo')}>Lleno</button></div>
+                            ) : (
+                              <div style={{display:'flex', gap:8}}>
+                                <button
+                                  className="btn primary"
+                                  onClick={() => setShowStripeCheckout({ parking: p, duration: 60, zone: 'A', spotNumber: Math.floor(Math.random()*50)+1 })}
+                                >
+                                  💳 Comprar
+                                </button>
+                                <button
+                                  className="btn btn--outline"
+                                  onClick={() => setShowReservationModal(p)}
+                                >
+                                  📅 Reservar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                        <Tooltip direction="top" offset={[0,-10]} opacity={0.94}>
+                          <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+                            <strong style={{display:'block',fontSize:'13px'}}>🏙 {p.name}</strong>
+                            {(() => {
+                              const ratio = p.totalSpots ? p.availableSpots / p.totalSpots : 0;
+                              const pct = Math.round(ratio * 100);
+                              return <span>Libre: {pct}%</span>;
+                            })()}
+                            {p.distanceKm !== undefined && (
+                              <span style={{display:'block',color:'#64748b'}}>Distancia: {p.distanceKm.toFixed(2)} km</span>
+                            )}
+                          </div>
+                        </Tooltip>
+                      </Marker>
+                    );
+                  })}
+
+                  {selectedParking && (
+                    <CircleMarker
+                      center={[selectedParking.lat, selectedParking.lng]}
+                      radius={14}
+                      pathOptions={{ color: '#06b6d4', weight: 2, opacity: 0.6, fillOpacity: 0.08 }}
+                    />
+                  )}
+
+                  {showReservationModal && (
+                    <ReservationModal
+                      parking={showReservationModal}
+                      token={token}
+                      onClose={() => setShowReservationModal(null)}
+                      onSuccess={() => { showToast('success','Reserva creada'); setShowReservationModal(null); }}
+                    />
+                  )}
+
+      {filteredParkings.map(p => {
+        const isSelected = selectedParking && selectedParking.id === p.id;
+        return (
+          <Marker
+            key={p.id}
+            position={[p.lat, p.lng]}
+            icon={createIcon(isSelected, hoveredId === p.id)}
+            eventHandlers={{
+              click: () => setSelectedParking(p),
+              mouseover: () => setHoveredId(p.id),
+              mouseout: () => setHoveredId(null)
+            }}
+          >
+            <Popup>
+              <div style={{ minWidth: 220 }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                  <div style={{flex: 1}}>
+                    <h4 style={{ margin: '0 0 4px 0' }}>{p.name}</h4>
+                    <ParkingRating parkingId={p.id} size="normal" />
+                  </div>
+                  {token && (
+                    <button
+                      onClick={() => toggleFavorite(p.id)}
+                      style={{background:'none',border:'none',fontSize:20,cursor:'pointer',padding:0,flexShrink:0,marginLeft:8}}
+                      title={favorites.includes(p.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                    >
+                      {favorites.includes(p.id) ? '⭐' : '☆'}
+                    </button>
+                  )}
+                </div>
+                <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                  {p.availableSpots} / {p.totalSpots} espacios disponibles
+                </p>
+                {p.distanceKm !== undefined && (
+                  <p style={{ margin: '6px 0', color: '#06b6d4', fontWeight: 600 }}>
+                    ⏱ ETA: {Math.round(p.etaMin || 0)} min
+                  </p>
+                )}
+                {p.availableSpots === 0 ? (
+                  <div className="popup-actions"><button className="btn" onClick={() => showToast('info','Busca otro parqueo')}>Lleno</button></div>
+                ) : (
+                  <div style={{display:'flex', gap:8}}>
+                    <button
+                      className="btn primary"
+                      onClick={() => setShowStripeCheckout({ parking: p, duration: 60, zone: 'A', spotNumber: Math.floor(Math.random()*50)+1 })}
+                    >
+                      💳 Comprar
+                    </button>
+                    <button
+                      className="btn btn--outline"
+                      onClick={() => setShowReservationModal(p)}
+                    >
+                      📅 Reservar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Popup>
+            <Tooltip direction="top" offset={[0,-10]} opacity={0.94}>
+              <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+                <strong style={{display:'block',fontSize:'13px'}}>🏙 {p.name}</strong>
+                {(() => {
+                  const ratio = p.totalSpots ? p.availableSpots / p.totalSpots : 0;
+                  const pct = Math.round(ratio * 100);
+                  return <span>Libre: {pct}%</span>;
+                })()}
+                {p.distanceKm !== undefined && (
+                  <span style={{display:'block',color:'#64748b'}}>Distancia: {p.distanceKm.toFixed(2)} km</span>
+                )}
+              </div>
+            </Tooltip>
+          </Marker>
+        );
+      })}
+        
+        {/* Geocoding Loading & Results */}
+        {geocodeLoading && (
+          <div style={{fontSize:11,color:'#64748b',marginBottom:8,padding:'6px 10px',background:'#f8fafc',borderRadius:6}}>
+            🔍 Buscando dirección...
+          </div>
+        )}
+        {!geocodeLoading && geocodeResults.length > 0 && (
+          <div style={{marginBottom:12}}>
+            <ul role="listbox" aria-label="Resultados de geocodificación" style={{listStyle:'none',margin:0,padding:0,maxHeight:200,overflowY:'auto',border:'1px solid #e2e8f0',borderRadius:8}}>
+              {geocodeResults.map(r => (
+                <li
+                  key={r.place_id}
+                  role="option"
+                  aria-selected={false}
+                  tabIndex={0}
+                  onClick={async ()=> {
+                    const next = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) };
+                    setUserPos(next);
+                    setSearchedLocation(next);
+                    if (leafletMap) leafletMap.setView([next.lat, next.lng], 15);
+                    setGeocodeResults([]);
+                    setAddressQuery('');
+                    setSearchQuery('');
+                    showToast('success','📍 Mostrando parqueos cercanos');
+                    
+                    // Buscar parqueos cercanos a esta dirección
+                    try {
+                      const nearby = await apiGet(`parkmaprd/parkings/nearest?lat=${next.lat}&lng=${next.lng}&limit=5`);
+                      console.log('Parqueos cercanos encontrados:', nearby);
+                      setNearbyParkings(Array.isArray(nearby) ? nearby : []);
+                      if (Array.isArray(nearby) && nearby.length > 0) {
+                        setSelectedParking(nearby[0]);
+                      } else {
+                        showToast('info', 'No se encontraron parqueos en esta ubicación');
+                      }
+                    } catch (e) {
+                      console.error('Error buscando parqueos cercanos:', e);
+                      showToast('error', 'Error al buscar parqueos cercanos');
+                      setNearbyParkings([]);
+                    }
+                  }}
+                  onKeyDown={async (e)=> { 
+                    if(e.key==='Enter'){ 
+                      const next = { lat: parseFloat(r.lat), lng: parseFloat(r.lon) }; 
+                      setUserPos(next);
+                      setSearchedLocation(next);
+                      if (leafletMap) leafletMap.setView([next.lat, next.lng], 15); 
+                      setGeocodeResults([]);
+                      setAddressQuery('');
+                      setSearchQuery('');
+                      showToast('success','📍 Mostrando parqueos cercanos');
+                      
+                      // Buscar parqueos cercanos
+                      try {
+                        const nearby = await apiGet(`parkmaprd/parkings/nearest?lat=${next.lat}&lng=${next.lng}&limit=5`);
+                        console.log('Parqueos cercanos (Enter):', nearby);
+                        setNearbyParkings(Array.isArray(nearby) ? nearby : []);
+                        if (Array.isArray(nearby) && nearby.length > 0) {
+                          setSelectedParking(nearby[0]);
+                        }
+                      } catch (e) {
+                        console.error('Error buscando parqueos:', e);
+                        showToast('error','Error al buscar parqueos cercanos');
+                      }
+                    }
+                  }}
+                  style={{padding:'10px 12px',fontSize:13,cursor:'pointer',borderBottom:'1px solid #e2e8f0',background:'#fff',transition:'background 0.2s'}}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+                >
+                  <div style={{fontWeight:500,color:'#1e293b',marginBottom:2}}>📍 {r.display_name.split(',')[0]}</div>
+                  <div style={{fontSize:11,color:'#64748b'}}>{r.display_name.substring(0, 60)}...</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {/* Quick Filters Section */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:'600',color:'#2c3e50',marginBottom:6}}>🔥 Filtros Rápidos</div>
+          <div style={{display:'flex',gap:6}}>
+            <button onClick={() => setSuggestMode('nearest')} className="btn" style={{flex:1, background: suggestMode==='nearest'?'#27ae60':'', color: suggestMode==='nearest'?'#fff':''}}>📍 Más Cercanos</button>
+            <button onClick={() => setSuggestMode('best')} className="btn" style={{flex:1, background: suggestMode==='best'?'#e74c3c':'', color: suggestMode==='best'?'#fff':''}}>🅿️ Mayor Disponibilidad</button>
+            <button onClick={() => setShowSmartSearch(true)} className="btn primary">🧠 Avanzada</button>
+          </div>
+        </div>
+
+        {/* Availability Filter */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:12,fontWeight:'600',color:'#2c3e50',marginBottom:6}}>⚙️ Disponibilidad</div>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer',padding:'6px 10px',background:'#f8f9fa',borderRadius:6,border:'1px solid #dee2e6'}}>
+            <input 
+              type="checkbox" 
+              checked={filterAvailable} 
+              onChange={(e) => setFilterAvailable(e.target.checked)}
+              style={{transform:'scale(1.1)'}}
+            />
+            <span style={{color:'#495057',fontWeight:'500'}}>🟢 Solo parqueos disponibles</span>
+          </label>
+          
+          {/* Nearby Parkings List - Debug siempre visible */}
+          {searchedLocation && (
+            <div style={{marginTop:12}}>
+              <div style={{fontSize:12,fontWeight:'600',color:'#2c3e50',marginBottom:6}}>
+                📍 Parqueos Cercanos {nearbyParkings.length > 0 ? `(${nearbyParkings.length})` : '(Buscando...)'}
+              </div>
+              {nearbyParkings.length === 0 ? (
+                <div style={{padding:'12px',fontSize:12,color:'#64748b',textAlign:'center',border:'1px solid #e2e8f0',borderRadius:8}}>
+                  🔍 No se encontraron parqueos en esta área
+                </div>
+              ) : (
+              <div style={{maxHeight:200,overflowY:'auto',border:'1px solid #e2e8f0',borderRadius:8}}>
+                {nearbyParkings.map((p, idx) => (
+                  <div
+                    key={p.id}
+                    onClick={() => {
+                      openCarouselAt(idx);
+                      if (leafletMap && p.lat && p.lng) leafletMap.setView([p.lat, p.lng], 16);
+                    }}
+                    style={{
+                      padding:'10px 12px',
+                      cursor:'pointer',
+                      borderBottom: idx < nearbyParkings.length - 1 ? '1px solid #e2e8f0' : 'none',
+                      background: selectedParking?.id === p.id ? '#eff6ff' : '#fff',
+                      transition:'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = selectedParking?.id === p.id ? '#dbeafe' : '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = selectedParking?.id === p.id ? '#eff6ff' : '#fff'}
+                  >
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:4}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <span style={{fontSize:11,fontWeight:700,color:'#3b82f6',minWidth:20}}>#{idx + 1}</span>
+                        <div style={{fontWeight:600,fontSize:13,color:'#1e293b'}}>{p.name}</div>
+                      </div>
+                      <div style={{
+                        fontSize:10,
+                        padding:'2px 6px',
+                        borderRadius:4,
+                        background: p.availableSpots > 0 ? '#dcfce7' : '#fee2e2',
+                        color: p.availableSpots > 0 ? '#166534' : '#991b1b',
+                        fontWeight:600
+                      }}>
+                        {p.availableSpots > 0 ? `✓ ${p.availableSpots}` : '✗ Lleno'}
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:12,fontSize:11,color:'#64748b',marginLeft:28}}>
+                      <span>📍 {p.distanceKm ? p.distanceKm.toFixed(2) : '0.00'} km</span>
+                      <span>💵 RD${p.hourlyRate || 100}/h</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Results Counter */}
+        <div style={{fontSize:11,color:'#6c757d',fontWeight:'500',textAlign:'center',padding:'6px 0',background:'rgba(52, 152, 219, 0.08)',borderRadius:8}}>
+          📍 Mostrando {filteredParkings.length} de {parkings.length} parqueos
+        </div>
+      </div>
+
+      {/* Floating map toolbar */}
+      <div className="map-toolbar" style={{position:'absolute',right:16,top:16,zIndex:4001,display:'flex',flexDirection:'column',gap:8}} aria-label="Controles del mapa">
+        <button className="btn btn--glass tool-btn" aria-label="Acercar mapa" onClick={()=> leafletMap && leafletMap.zoomIn()}>＋</button>
+        <button className="btn btn--glass tool-btn" aria-label="Alejar mapa" onClick={()=> leafletMap && leafletMap.zoomOut()}>－</button>
+        <button className="btn btn--glass tool-btn" aria-label="Ir a mi ubicación" onClick={locateMe}>📍</button>
+        <button className="btn btn--glass tool-btn" aria-label="Seleccionar parqueo más cercano" onClick={redirectToNearest}>➡️</button>
+      </div>
+      
+      {/* Renderización de marcadores (sin clustering) */}
+      {filteredParkings.map((p) => {
+        const isSelected = selectedParking && selectedParking.id === p.id;
+        const pWithInfo = p;
+        return (
+          <Marker
+            key={p.id}
+            position={[p.lat, p.lng]}
+            icon={createIcon(isSelected, hoveredId === p.id)}
+            parkingMeta={{ availableSpots: pWithInfo.availableSpots, totalSpots: pWithInfo.totalSpots }}
+            eventHandlers={{ 
+              click: () => setSelectedParking(pWithInfo),
+              mouseover: () => setHoveredId(p.id),
+              mouseout: () => setHoveredId(null)
+            }}
+          >
+            <Popup>
+              <div style={{ minWidth: 220 }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                  <div style={{flex: 1}}>
+                    <h4 style={{ margin: '0 0 4px 0' }}>{pWithInfo.name}</h4>
+                    <ParkingRating parkingId={pWithInfo.id} size="normal" />
+                  </div>
+                  {token && (
+                    <button 
+                      onClick={() => toggleFavorite(pWithInfo.id)}
+                      style={{background:'none',border:'none',fontSize:20,cursor:'pointer',padding:0,flexShrink:0,marginLeft:8}}
+                      title={favorites.includes(pWithInfo.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                    >
+                      {favorites.includes(pWithInfo.id) ? '⭐' : '☆'}
+                    </button>
+                  )}
+                </div>
+                <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                  {pWithInfo.availableSpots} / {pWithInfo.totalSpots} espacios disponibles
+                </p>
+                {pWithInfo.distanceKm && <p style={{ margin: '6px 0', color: '#06b6d4', fontWeight: 600 }}>
+                  ⏱ Tiempo estimado: {Math.round(pWithInfo.etaMin || 0)} minutos
+                </p>}
+                {pWithInfo.availableSpots === 0 ? (
+                  <div className="popup-actions"><button className="btn" onClick={redirectToNearest}>Buscar otro parqueo</button></div>
+                ) : (
+                  <div>
+                    <div className="popup-actions" style={{display:'flex', gap:8,marginBottom:8}}>
+                      <button 
+                        className="btn primary" 
+                        onClick={()=> {
+                          if (pWithInfo.sellsTickets === false || pWithInfo.sellsTickets === 0) {
+                            showToast('warning', '⚠️ Este parqueo no vende tickets en línea');
+                            return;
+                          }
+                          setShowStripeCheckout({ 
+                            parking: pWithInfo, 
+                            duration: 60, 
+                            zone: 'A', 
+                            spotNumber: Math.floor(Math.random() * 50) + 1 
+                          });
+                        }}
+                        title="Comprar ticket ahora"
+                      >
+                        💳 Comprar Ahora
+                      </button>
+                      <button 
+                        className="btn btn--outline" 
+                        onClick={()=> setShowReservationModal(pWithInfo)}
+                        title="Reservar con anticipación"
+                      >
+                        📅 Reservar
+                      </button>
+                    </div>
+                    <div className="popup-actions" style={{display:'flex', gap:8}}>
+                      <button 
+                        className="btn btn--outline" 
+                        onClick={()=> navigateTo(pWithInfo)}
+                        title="Abrir direcciones en Google Maps"
+                      >
+                        🗺️ Cómo llegar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Popup>
+            <Tooltip direction="top" offset={[0,-10]} opacity={0.94} className="parking-tooltip">
+              <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+                <strong style={{display:'block',fontSize:'13px'}}>🏙 {pWithInfo.name}</strong>
+                {(() => {
+                  const ratio = pWithInfo.totalSpots ? pWithInfo.availableSpots / pWithInfo.totalSpots : 0;
+                  const cls = ratio === 0 ? 'occ-empty' : (ratio < 0.33 ? 'occ-low' : (ratio < 0.66 ? 'occ-mid' : 'occ-high'));
+                  const pct = Math.round(ratio * 100);
+                  return (
+                    <>
+                      <span className={cls}>Disponibles: {pWithInfo.availableSpots}/{pWithInfo.totalSpots}</span>
+                      <span className={`occ-badge ${cls}`} style={{marginLeft:4}}>{pct}% libre</span>
+                    </>
+                  );
+                })()}
+                {pWithInfo.distanceKm !== undefined && (
+                  <span style={{display:'block',color:'#64748b'}}>Distancia: {pWithInfo.distanceKm.toFixed(2)} km</span>
+                )}
+                {pWithInfo.etaMin !== undefined && (
+                  <span style={{display:'block',color:'#6366f1'}}>ETA: {Math.round(pWithInfo.etaMin)} min</span>
+                )}
+              </div>
+            </Tooltip>
+          </Marker>
+        );
+      })}
+
+      {selectedParking && (
+        <>
+          spiderfyOnMaxZoom={false}
+          showCoverageOnHover={false}
+          iconCreateFunction={(cluster) => {
+            const markers = cluster.getAllChildMarkers();
+            let available = 0; let total = 0;
+            markers.forEach(m => {
+              const meta = m.options.parkingMeta;
+              if (meta) { available += meta.availableSpots; total += meta.totalSpots; }
+            });
+            const count = cluster.getChildCount();
+            const ratio = total ? Math.round((available / total) * 100) : 0;
+            let color;
+            if (total === 0) color = '#64748b';
+            else if (ratio === 0) color = '#ef4444';
+            else if (ratio < 33) color = '#f59e0b';
+            else if (ratio < 66) color = '#3b82f6';
+            else color = '#10b981';
+            return L.divIcon({
+              html: `<div class="cluster-inner" style="background:radial-gradient(circle at 30% 30%, ${color}, #0f172a);"><span class='cl-count'>${count}</span><span class='cl-pct'>${ratio}%</span></div>`,
+              className: 'marker-cluster marker-cluster-custom',
+              iconSize: L.point(46, 46, true)
+            });
+          }}
+        >
+          {filteredParkings.filter(p=> !selectedParking || p.id !== selectedParking.id).map((p) => {
+            const isSelected = false; // excluded if selectedParking
+            const pWithInfo = p;
+            return (
+              <Marker
+                key={p.id}
+                position={[p.lat, p.lng]}
+                icon={createIcon(isSelected, hoveredId === p.id)}
+                parkingMeta={{ availableSpots: pWithInfo.availableSpots, totalSpots: pWithInfo.totalSpots }}
+                eventHandlers={{ 
+                  click: () => setSelectedParking(pWithInfo),
+                  mouseover: () => setHoveredId(p.id),
+                  mouseout: () => setHoveredId(null)
+                }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 220 }}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                      <div style={{flex: 1}}>
+                        <h4 style={{ margin: '0 0 4px 0' }}>{pWithInfo.name}</h4>
+                        <ParkingRating parkingId={pWithInfo.id} size="normal" />
+                      </div>
+                      {token && (
+                        <button 
+                          onClick={() => toggleFavorite(pWithInfo.id)}
+                          style={{background:'none',border:'none',fontSize:20,cursor:'pointer',padding:0,flexShrink:0,marginLeft:8}}
+                          title={favorites.includes(pWithInfo.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                        >
+                          {favorites.includes(pWithInfo.id) ? '⭐' : '☆'}
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                      {pWithInfo.availableSpots} / {pWithInfo.totalSpots} espacios disponibles
+                    </p>
+                    {pWithInfo.distanceKm && <p style={{ margin: '6px 0', color: '#06b6d4', fontWeight: 600 }}>
+                      ⏱ Tiempo estimado: {Math.round(pWithInfo.etaMin || 0)} minutos
+                    </p>}
+                    {pWithInfo.availableSpots === 0 ? (
+                      <div className="popup-actions"><button className="btn" onClick={redirectToNearest}>Buscar otro parqueo</button></div>
+                    ) : (
+                      <div>
+                        <div className="popup-actions" style={{display:'flex', gap:8,marginBottom:8}}>
+                          <button 
+                            className="btn primary" 
+                            onClick={()=> {
+                              if (pWithInfo.sellsTickets === false || pWithInfo.sellsTickets === 0) {
+                                // Correct argument order: first type, then message
+                                showToast('warning', '⚠️ Este parqueo no vende tickets en línea');
+                                return;
+                              }
+                              setShowStripeCheckout({ 
+                                parking: pWithInfo, 
+                                duration: 60, 
+                                zone: 'A', 
+                                spotNumber: Math.floor(Math.random() * 50) + 1 
+                              });
+                            }}
+                            title="Comprar ticket ahora"
+                          >
+                            💳 Comprar Ahora
+                          </button>
+                          <button 
+                            className="btn btn--outline" 
+                            onClick={()=> setShowReservationModal(pWithInfo)}
+                            title="Reservar con anticipación"
+                          >
+                            📅 Reservar
+                          </button>
+                        </div>
+                        <div className="popup-actions" style={{display:'flex', gap:8}}>
+                          <button 
+                            className="btn btn--outline" 
+                            onClick={()=> navigateTo(pWithInfo)}
+                            title="Abrir direcciones en Google Maps"
+                          >
+                            🗺️ Cómo llegar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Popup>
+                <Tooltip direction="top" offset={[0,-10]} opacity={0.94} className="parking-tooltip">
+                  <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+                    <strong style={{display:'block',fontSize:'13px'}}>🏙 {pWithInfo.name}</strong>
+                    {(() => {
+                      const ratio = pWithInfo.totalSpots ? pWithInfo.availableSpots / pWithInfo.totalSpots : 0;
+                      const cls = ratio === 0 ? 'occ-empty' : (ratio < 0.33 ? 'occ-low' : (ratio < 0.66 ? 'occ-mid' : 'occ-high'));
+                      const pct = Math.round(ratio * 100);
+                      return (
+                        <>
+                          <span className={cls}>Disponibles: {pWithInfo.availableSpots}/{pWithInfo.totalSpots}</span>
+                          <span className={`occ-badge ${cls}`} style={{marginLeft:4}}>{pct}% libre</span>
+                        </>
+                      );
+                    })()}
+                    {pWithInfo.distanceKm !== undefined && (
+                      <span style={{display:'block',color:'#64748b'}}>Distancia: {pWithInfo.distanceKm.toFixed(2)} km</span>
+                    )}
+                    {pWithInfo.etaMin !== undefined && (
+                      <span style={{display:'block',color:'#6366f1'}}>ETA: {Math.round(pWithInfo.etaMin)} min</span>
+                    )}
+                  </div>
+                </Tooltip>
+              </Marker>
+            );
+          })}
+        {/* Fin agrupamiento, solo marcadores normales */}
+      ) : (
+        filteredParkings.map((p) => {
+          const isSelected = selectedParking && selectedParking.id === p.id;
+          const pWithInfo = p;
+          return (
+            <Marker
+              key={p.id}
+              position={[p.lat, p.lng]}
+              icon={createIcon(isSelected, hoveredId === p.id)}
+              parkingMeta={{ availableSpots: pWithInfo.availableSpots, totalSpots: pWithInfo.totalSpots }}
+              eventHandlers={{ 
+                click: () => setSelectedParking(pWithInfo),
+                mouseover: () => setHoveredId(p.id),
+                mouseout: () => setHoveredId(null)
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: 220 }}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                    <div style={{flex: 1}}>
+                      <h4 style={{ margin: '0 0 4px 0' }}>{pWithInfo.name}</h4>
+                      <ParkingRating parkingId={pWithInfo.id} size="normal" />
+                    </div>
+                    {token && (
+                      <button 
+                        onClick={() => toggleFavorite(pWithInfo.id)}
+                        style={{background:'none',border:'none',fontSize:20,cursor:'pointer',padding:0,flexShrink:0,marginLeft:8}}
+                        title={favorites.includes(pWithInfo.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                      >
+                        {favorites.includes(pWithInfo.id) ? '⭐' : '☆'}
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                    {pWithInfo.availableSpots} / {pWithInfo.totalSpots} espacios disponibles
+                  </p>
+                  {pWithInfo.distanceKm && <p style={{ margin: '6px 0', color: '#06b6d4', fontWeight: 600 }}>
+                    ⏱ Tiempo estimado: {Math.round(pWithInfo.etaMin || 0)} minutos
+                  </p>}
+                  {pWithInfo.availableSpots === 0 ? (
+                    <div className="popup-actions"><button className="btn" onClick={redirectToNearest}>Buscar otro parqueo</button></div>
+                  ) : (
+                    <div>
+                      <div className="popup-actions" style={{display:'flex', gap:8,marginBottom:8}}>
+                        <button 
+                          className="btn primary" 
+                          onClick={()=> {
+                            if (pWithInfo.sellsTickets === false || pWithInfo.sellsTickets === 0) {
+                              showToast('⚠️ Este parqueo no vende tickets en línea', 'warning');
+                              return;
+                            }
+                            setShowStripeCheckout({ 
+                              parking: pWithInfo, 
+                              duration: 60, 
+                              zone: 'A', 
+                              spotNumber: Math.floor(Math.random() * 50) + 1 
+                            });
+                          }}
+                          title="Comprar ticket ahora"
+                        >
+                          💳 Comprar Ahora
+                        </button>
+                        <button 
+                          className="btn btn--outline" 
+                          onClick={()=> setShowReservationModal(pWithInfo)}
+                          title="Reservar con anticipación"
+                        >
+                          📅 Reservar
+                        </button>
+                      </div>
+                      <div className="popup-actions" style={{display:'flex', gap:8}}>
+                        <button 
+                          className="btn btn--outline" 
+                          onClick={()=> navigateTo(pWithInfo)}
+                          title="Abrir direcciones en Google Maps"
+                        >
+                          🗺️ Cómo llegar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Popup>
+              <Tooltip direction="top" offset={[0,-10]} opacity={0.94} className="parking-tooltip">
+                <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+                  <strong style={{display:'block',fontSize:'13px'}}>🏙 {pWithInfo.name}</strong>
+                  {(() => {
+                    const ratio = pWithInfo.totalSpots ? pWithInfo.availableSpots / pWithInfo.totalSpots : 0;
+                    const cls = ratio === 0 ? 'occ-empty' : (ratio < 0.33 ? 'occ-low' : (ratio < 0.66 ? 'occ-mid' : 'occ-high'));
+                    const pct = Math.round(ratio * 100);
+                    return (
+                      <>
+                        <span className={cls}>Disponibles: {pWithInfo.availableSpots}/{pWithInfo.totalSpots}</span>
+                        <span className={`occ-badge ${cls}`} style={{marginLeft:4}}>{pct}% libre</span>
+                      </>
+                    );
+                  })()}
+                  {pWithInfo.distanceKm !== undefined && (
+                    <span style={{display:'block',color:'#64748b'}}>Distancia: {pWithInfo.distanceKm.toFixed(2)} km</span>
+                  )}
+                  {pWithInfo.etaMin !== undefined && (
+                    <span style={{display:'block',color:'#6366f1'}}>ETA: {Math.round(pWithInfo.etaMin)} min</span>
+                  )}
+                </div>
+              </Tooltip>
+            </Marker>
+          );
+        })}
+
+      {selectedParking && (
+        <>
+          <CircleMarker
+            center={[selectedParking.lat, selectedParking.lng]}
+            radius={18}
+            pathOptions={{ color: '#06b6d4', weight: 2, opacity: 0.6, fillOpacity: 0.08 }}
+          />
+          <Marker position={[selectedParking.lat, selectedParking.lng]} icon={createIcon(true, true)}>
+          <Popup onClose={() => setSelectedParking(null)}>
+            <div style={{ minWidth: 220 }}>
+              <h4 style={{ margin: 0 }}>{selectedParking.name}</h4>
+              <p style={{ margin: '6px 0', color: '#94a3b8' }}>
+                {selectedParking.availableSpots} / {selectedParking.totalSpots} spots free
+              </p>
+            </div>
+          </Popup>
+          <Tooltip direction="top" offset={[0,-10]} opacity={0.94} className="parking-tooltip">
+            <div style={{fontSize:'12px',lineHeight:'1.25',minWidth:'150px'}}>
+              <strong style={{display:'block',fontSize:'13px'}}>✅ {selectedParking.name}</strong>
+              {(() => {
+                const ratio = selectedParking.totalSpots ? selectedParking.availableSpots / selectedParking.totalSpots : 0;
+                const cls = ratio === 0 ? 'occ-empty' : (ratio < 0.33 ? 'occ-low' : (ratio < 0.66 ? 'occ-mid' : 'occ-high'));
+                const pct = Math.round(ratio * 100);
+                return (
+                  <>
+                    <span className={cls}>Disponibles: {selectedParking.availableSpots}/{selectedParking.totalSpots}</span>
+                    <span className={`occ-badge ${cls}`} style={{marginLeft:4}}>{pct}% libre</span>
+                  </>
+                );
+              })()}
+            </div>
+          </Tooltip>
+          </Marker>
+        </>
+      )}
+
+      {/* Smart Search Panel */}
+      {showSmartSearch && (
+        <div style={{
+          position: 'absolute',
+          top: 20,
+          left: 20,
+          right: 20,
+          bottom: 20,
+          zIndex: 5000,
+          display: 'flex',
+          gap: 20,
+          background: 'rgba(0,0,0,0.05)',
+          borderRadius: 12,
+          padding: 20
+        }}>
+          {/* Filters Column */}
+          <div style={{ width: 350, display: 'flex', flexDirection: 'column', gap: 15 }}>
+            <SearchFilters 
+              token={token}
+              onFiltersChange={handleFiltersChange}
+              initialLocation={userPos}
+            />
+          </div>
+          
+          {/* Results Column */}
+          <div style={{ flex: 1 }}>
+            <SearchResults 
+              results={searchResults}
+              loading={searchLoading}
+              onParkingSelect={handleSearchResultSelect}
+              userLocation={userPos}
+            />
+          </div>
+          
+          {/* Close Button */}
+          <button
+            onClick={() => setShowSmartSearch(false)}
+            style={{
+              position: 'absolute',
+              top: 15,
+              right: 15,
+              background: '#e74c3c',
+              color: 'white',
+              border: 'none',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}
+          >
+            ✕ Cerrar
+          </button>
+        </div>
+      )}
+
+
+      
+      {showReservationModal && (
+        <ReservationModal 
+          parking={showReservationModal}
+          token={token}
+          onClose={() => setShowReservationModal(null)}
+          onSuccess={() => { showToast('success','Reserva creada'); setShowReservationModal(null); }}
+        />
+      )}
+      
+      {showStripeCheckout && (
+        <StripeCheckout
+          parking={showStripeCheckout.parking}
+          duration={showStripeCheckout.duration}
+          zone={showStripeCheckout.zone}
+          spotNumber={showStripeCheckout.spotNumber}
+          onSuccess={() => { showToast('success','Pago procesado, ticket listo'); setShowStripeCheckout(null); }}
+          onCancel={() => setShowStripeCheckout(null)}
+        />
+      )}
+
+      {/* Nearby Parkings Carousel Modal */}
+      {showNearbyCarousel && nearbyParkings.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: darkMode ? '#1e293b' : 'white',
+            borderRadius: '16px',
+            maxWidth: '600px',
+            width: '100%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              padding: '20px',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{margin: 0, fontSize: '20px'}}>🅿️ Parqueos Cercanos</h3>
+              <button 
+                onClick={() => setShowNearbyCarousel(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'white',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Carousel Content */}
+            <div style={{padding: '30px 20px'}}>
+              {(() => {
+                const p = nearbyParkings[carouselIndex];
+                return (
+                  <div>
+                    <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                      <h2 style={{
+                        margin: '0 0 10px 0',
+                        color: darkMode ? '#f8fafc' : '#1e293b',
+                        fontSize: '24px'
+                      }}>
+                        {p.name}
+                      </h2>
+                      <div style={{
+                        display: 'inline-block',
+                        background: p.availableSpots > 0 ? '#10b981' : '#ef4444',
+                        color: 'white',
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}>
+                        {p.availableSpots > 0 ? `✓ ${p.availableSpots} espacios disponibles` : '✗ Sin espacios'}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '16px',
+                      marginBottom: '24px'
+                    }}>
+                      <div style={{
+                        background: darkMode ? '#334155' : '#f1f5f9',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{fontSize: '28px', marginBottom: '6px'}}>📍</div>
+                        <div style={{fontSize: '24px', fontWeight: 'bold', color: '#3b82f6'}}>
+                          {p.distanceKm ? p.distanceKm.toFixed(2) : '0.00'} km
+                        </div>
+                        <div style={{fontSize: '12px', color: '#64748b'}}>Distancia</div>
+                      </div>
+
+                      <div style={{
+                        background: darkMode ? '#334155' : '#f1f5f9',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{fontSize: '28px', marginBottom: '6px'}}>💵</div>
+                        <div style={{fontSize: '24px', fontWeight: 'bold', color: '#10b981'}}>
+                          RD$ {p.hourlyRate || 100}/h
+                        </div>
+                        <div style={{fontSize: '12px', color: '#64748b'}}>Precio</div>
+                      </div>
+                    </div>
+
+                    {/* Navigation Arrows */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '16px',
+                      marginBottom: '20px'
+                    }}>
+                      <button
+                        onClick={() => {
+                          const newIndex = carouselIndex > 0 ? carouselIndex - 1 : nearbyParkings.length - 1;
+                          setCarouselIndex(newIndex);
+                          setSelectedParking(nearbyParkings[newIndex]);
+                        }}
+                        style={{
+                          background: darkMode ? '#475569' : '#e2e8f0',
+                          border: 'none',
+                          color: darkMode ? 'white' : '#1e293b',
+                          padding: '12px 20px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '18px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ← Anterior
+                      </button>
+                      <div style={{
+                        color: darkMode ? '#94a3b8' : '#64748b',
+                        fontSize: '14px',
+                        minWidth: '80px',
+                        textAlign: 'center'
+                      }}>
+                        {carouselIndex + 1} de {nearbyParkings.length}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newIndex = carouselIndex < nearbyParkings.length - 1 ? carouselIndex + 1 : 0;
+                          setCarouselIndex(newIndex);
+                          setSelectedParking(nearbyParkings[newIndex]);
+                        }}
+                        style={{
+                          background: darkMode ? '#475569' : '#e2e8f0',
+                          border: 'none',
+                          color: darkMode ? 'white' : '#1e293b',
+                          padding: '12px 20px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '18px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        Siguiente →
+                      </button>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                      <button
+                        onClick={() => {
+                          navigateTo(p);
+                          setShowNearbyCarousel(false);
+                          showToast('success', '🚗 Abriendo Google Maps...');
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '14px',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          transition: 'transform 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        🗺️ Ir a {p.name}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowReservationModal(p);
+                          setShowNearbyCarousel(false); // cerrar carrusel al abrir reserva
+                          showToast('info','Formulario de reserva abierto');
+                        }}
+                        style={{
+                          width:'100%',
+                          background: darkMode ? '#0d9488' : '#10b981',
+                          color:'white',
+                          border:'none',
+                          padding:'14px',
+                          borderRadius:'10px',
+                          cursor:'pointer',
+                          fontSize:'16px',
+                          fontWeight:'600'
+                        }}
+                      >
+                        📅 Reservar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReservationModal && (
+        <ReservationModal
+          parking={showReservationModal}
+          token={token}
+          onClose={() => setShowReservationModal(null)}
+          onSuccess={() => { showToast('success','Reserva creada'); setShowReservationModal(null); }}
+        />
+      )}
+
+      {showStripeCheckout && (
+        <StripeCheckout
+          parking={showStripeCheckout.parking}
+          duration={showStripeCheckout.duration}
+          zone={showStripeCheckout.zone}
+          spotNumber={showStripeCheckout.spotNumber}
+          onSuccess={() => { showToast('success','Pago procesado'); setShowStripeCheckout(null); }}
+          onCancel={() => setShowStripeCheckout(null)}
+        />
+      )}
+    </MapContainer>
+  );
+}
+
