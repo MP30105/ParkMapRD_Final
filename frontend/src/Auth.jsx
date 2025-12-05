@@ -9,8 +9,7 @@ function Auth({ onAuthSuccess, initialMode = "login" }) {
   const [attempted, setAttempted] = useState(false);
   const testAccounts = [
     { label: 'Demo', username: 'demo', password: 'testpass' },
-    { label: 'Admin', username: 'admin', password: 'admin' },
-    { label: 'Main', username: 'mainadmin', password: 'mainpass' }
+    { label: 'Admin', username: 'admin', password: 'admin' }
   ];
 
   const quickLogin = async (u, p) => {
@@ -293,16 +292,7 @@ function Auth({ onAuthSuccess, initialMode = "login" }) {
               type="button"
               className="btn"
               disabled={submitting}
-              onClick={() => quickLogin('main@parkmaprd.local', 'mainpass')}
-              title="Entrar directamente con el usuario main"
-            >
-              Main
-            </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={submitting}
-              onClick={() => quickLogin('manager_main_street_parking', 'manager123')}
+              onClick={() => quickLogin('manager1', 'manager1')}
               title="Entrar rápidamente como Manager de parqueo"
             >
               Manager
